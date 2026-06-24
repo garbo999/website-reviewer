@@ -39,6 +39,8 @@ function ScoreCard({ label, data }: { label: string; data: Dimension }) {
 export default function Home() {
   const [url, setUrl] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("German");
+  const [mode, setMode] = useState<"ai" | "mqm">("ai");
+  const [usedMode, setUsedMode] = useState<"ai" | "mqm">("ai");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,10 +54,11 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, targetLanguage }),
+        body: JSON.stringify({ url, targetLanguage, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
+      setUsedMode(data.mode ?? "ai");
       setAnalysis(data.analysis);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -83,6 +86,21 @@ export default function Home() {
           placeholder="https://commission.europa.eu/index_de"
           style={{ padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db" }}
         />
+        <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+          <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
+          {(["ai", "mqm"] as const).map((m) => (
+            <label key={m} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+              <input
+                type="radio"
+                name="mode"
+                value={m}
+                checked={mode === m}
+                onChange={() => setMode(m)}
+              />
+              {m === "ai" ? "AI Judgment" : "MQM Framework"}
+            </label>
+          ))}
+        </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <label htmlFor="lang">Page language:</label>
           <select
@@ -129,7 +147,17 @@ export default function Home() {
               {analysis.overall.score}/10
             </div>
             <div>
-              <strong style={{ fontSize: 16 }}>Overall Score — {targetLanguage}</strong>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <strong style={{ fontSize: 16 }}>Overall Score — {targetLanguage}</strong>
+                <span style={{
+                  fontSize: 11, padding: "2px 8px", borderRadius: 12,
+                  background: usedMode === "mqm" ? "#dbeafe" : "#f3f4f6",
+                  color: usedMode === "mqm" ? "#1d4ed8" : "#6b7280",
+                  fontWeight: 600, textTransform: "uppercase",
+                }}>
+                  {usedMode === "mqm" ? "MQM" : "AI Judgment"}
+                </span>
+              </div>
               <p style={{ margin: "4px 0 0", color: "#374151" }}>{analysis.overall.summary}</p>
             </div>
           </div>

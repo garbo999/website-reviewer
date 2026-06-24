@@ -11,36 +11,8 @@ function extractText(html: string): string {
   return text.slice(0, 6000); // keep within token limits
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const { url, targetLanguage } = await req.json();
-
-    if (!url || !targetLanguage) {
-      return NextResponse.json({ error: "Missing url or targetLanguage" }, { status: 400 });
-    }
-
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; LocalizationReviewer/1.0)" },
-    });
-
-    if (!response.ok) {
-      return NextResponse.json({ error: `Failed to fetch URL: ${response.status}` }, { status: 400 });
-    }
-
-    const html = await response.text();
-    const pageText = extractText(html);
-
-    if (!pageText || pageText.length < 50) {
-      return NextResponse.json({ error: "Could not extract enough text from the page." }, { status: 400 });
-    }
-
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1500,
-      messages: [
-        {
-          role: "user",
-          content: `You are an expert localization reviewer. Analyze the following web page text which should be in ${targetLanguage}.
+function aiPrompt(targetLanguage: string, pageText: string): string {
+  return `You are an expert localization reviewer. Analyze the following web page text which should be in ${targetLanguage}.
 
 Score it on these 4 dimensions from 1 (poor) to 10 (excellent):
 1. Linguistic Quality — fluency, grammar, naturalness in ${targetLanguage}
@@ -65,9 +37,70 @@ Respond in this exact JSON format:
 }
 
 Page text:
-${pageText}`,
-        },
-      ],
+${pageText}`;
+}
+
+function mqmPrompt(targetLanguage: string, pageText: string): string {
+  return `You are an expert localization reviewer applying the MQM (Multidimensional Quality Metrics) framework. Analyze the following web page text which should be in ${targetLanguage}.
+
+Identify errors in these MQM categories and map them to 4 dimensions:
+
+1. Linguistic Quality (MQM: Fluency) — grammar, spelling, punctuation, awkward phrasing
+2. Terminology Consistency (MQM: Terminology) — wrong terms, inconsistent use of key terms
+3. Cultural Adaptation (MQM: Style + Locale Conventions) — inappropriate register, wrong date/number/currency formats, untransferred cultural references
+4. Completeness (MQM: Accuracy) — mistranslations, omissions, untranslated strings
+
+For each dimension:
+- List errors found, each classified as: Critical (penalty 25), Major (penalty 5), or Minor (penalty 1)
+- Calculate score: start at 100, subtract total penalties, cap at 0, divide by 10
+- Give one sentence explanation and one quoted example from the text
+
+Then give an Overall score (average of the 4) and a 2-sentence summary.
+
+Respond in this exact JSON format:
+{
+  "linguistic_quality": { "score": 0, "explanation": "", "example": "" },
+  "terminology_consistency": { "score": 0, "explanation": "", "example": "" },
+  "cultural_adaptation": { "score": 0, "explanation": "", "example": "" },
+  "completeness": { "score": 0, "explanation": "", "example": "" },
+  "overall": { "score": 0, "summary": "" }
+}
+
+Page text:
+${pageText}`;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { url, targetLanguage, mode } = await req.json();
+
+    if (!url || !targetLanguage) {
+      return NextResponse.json({ error: "Missing url or targetLanguage" }, { status: 400 });
+    }
+
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; LocalizationReviewer/1.0)" },
+    });
+
+    if (!response.ok) {
+      return NextResponse.json({ error: `Failed to fetch URL: ${response.status}` }, { status: 400 });
+    }
+
+    const html = await response.text();
+    const pageText = extractText(html);
+
+    if (!pageText || pageText.length < 50) {
+      return NextResponse.json({ error: "Could not extract enough text from the page." }, { status: 400 });
+    }
+
+    const prompt = mode === "mqm"
+      ? mqmPrompt(targetLanguage, pageText)
+      : aiPrompt(targetLanguage, pageText);
+
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1500,
+      messages: [{ role: "user", content: prompt }],
     });
 
     const raw = message.content[0].type === "text" ? message.content[0].text : "";
@@ -78,7 +111,7 @@ ${pageText}`,
     }
 
     const analysis = JSON.parse(jsonMatch[0]);
-    return NextResponse.json({ analysis, url, targetLanguage });
+    return NextResponse.json({ analysis, url, targetLanguage, mode: mode ?? "ai" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Analysis failed";
     return NextResponse.json({ error: msg }, { status: 500 });
