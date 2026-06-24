@@ -6,7 +6,7 @@ const LANGUAGES = [
   "English", "German", "French", "Spanish", "Italian", "Portuguese",
   "Dutch", "Polish", "Swedish", "Danish", "Finnish",
   "Czech", "Romanian", "Hungarian", "Bulgarian", "Croatian",
-  "Japanese", "Chinese", "Arabic", "Korean",
+  "Japanese", "Chinese", "Arabic", "Korean", "Turkish",
 ];
 
 type Dimension = { score: number; explanation: string; example: string };
