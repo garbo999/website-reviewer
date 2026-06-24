@@ -23,9 +23,11 @@ Score it on these 4 dimensions from 1 (poor) to 10 (excellent):
 For each dimension, give:
 - A score (1-10)
 - One sentence of explanation
-- One specific example from the text (quote directly if possible)
+- One specific example from the text (use single quotes for any quoted text — never double quotes inside JSON strings)
 
 Then give an Overall score (average) and a 2-sentence summary recommendation.
+
+IMPORTANT: Return only valid JSON. Use single quotes for any text you quote from the page inside the JSON string values.
 
 Respond in this exact JSON format:
 {
@@ -53,9 +55,11 @@ Identify errors in these MQM categories and map them to 4 dimensions:
 For each dimension:
 - List errors found, each classified as: Critical (penalty 25), Major (penalty 5), or Minor (penalty 1)
 - Calculate score: start at 100, subtract total penalties, cap at 0, divide by 10
-- Give one sentence explanation and one quoted example from the text
+- Give one sentence explanation and one example from the text (use single quotes for any quoted text — never double quotes inside JSON strings)
 
 Then give an Overall score (average of the 4) and a 2-sentence summary.
+
+IMPORTANT: Return only valid JSON. Use single quotes for any text you quote from the page inside the JSON string values.
 
 Respond in this exact JSON format:
 {
@@ -110,7 +114,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not parse analysis response." }, { status: 500 });
     }
 
-    const analysis = JSON.parse(jsonMatch[0]);
+    let analysis;
+    try {
+      analysis = JSON.parse(jsonMatch[0]);
+    } catch {
+      // Sanitize unescaped double quotes inside JSON string values and retry
+      const sanitized = jsonMatch[0].replace(/:\s*"([\s\S]*?)(?<!\\)"(?=\s*[,}])/g, (_, val) => {
+        return `: "${val.replace(/(?<!\\)"/g, "'")}"`;
+      });
+      analysis = JSON.parse(sanitized);
+    }
     return NextResponse.json({ analysis, url, targetLanguage, mode: mode ?? "ai" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Analysis failed";
