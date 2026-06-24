@@ -123,6 +123,12 @@ export default function Home() {
           />
         </div>
 
+        {isComparison && (
+          <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
+            Note: For accurate comparison, source and target pages should be translations of the same content.
+          </p>
+        )}
+
         {!isComparison && (
           <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
             <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
