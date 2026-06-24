@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 const LANGUAGES = [
-  "German", "French", "Spanish", "Italian", "Portuguese",
+  "English", "German", "French", "Spanish", "Italian", "Portuguese",
   "Dutch", "Polish", "Swedish", "Danish", "Finnish",
   "Czech", "Romanian", "Hungarian", "Bulgarian", "Croatian",
   "Japanese", "Chinese", "Arabic", "Korean",
@@ -16,6 +16,19 @@ type Analysis = {
   cultural_adaptation: Dimension;
   completeness: Dimension;
   overall: { score: number; summary: string };
+};
+type Mode = "ai" | "mqm" | "comparison";
+
+const MODE_LABELS: Record<Mode, string> = {
+  ai: "AI Judgment",
+  mqm: "MQM",
+  comparison: "Comparison",
+};
+
+const MODE_COLORS: Record<Mode, { bg: string; text: string }> = {
+  ai: { bg: "#f3f4f6", text: "#6b7280" },
+  mqm: { bg: "#dbeafe", text: "#1d4ed8" },
+  comparison: { bg: "#fef3c7", text: "#92400e" },
 };
 
 function ScoreCard({ label, data }: { label: string; data: Dimension }) {
@@ -37,16 +50,20 @@ function ScoreCard({ label, data }: { label: string; data: Dimension }) {
 }
 
 export default function Home() {
-  const [url, setUrl] = useState("");
+  const [targetUrl, setTargetUrl] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [targetLanguage, setTargetLanguage] = useState("German");
   const [mode, setMode] = useState<"ai" | "mqm">("ai");
-  const [usedMode, setUsedMode] = useState<"ai" | "mqm">("ai");
+  const [usedMode, setUsedMode] = useState<Mode>("ai");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const canAnalyze = targetUrl.trim() || sourceUrl.trim();
+  const isComparison = targetUrl.trim() && sourceUrl.trim();
+
   async function handleAnalyze() {
-    if (!url.trim()) return;
+    if (!canAnalyze) return;
     setIsLoading(true);
     setError("");
     setAnalysis(null);
@@ -54,7 +71,7 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, targetLanguage, mode }),
+        body: JSON.stringify({ url: targetUrl, sourceUrl, targetLanguage, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
@@ -71,38 +88,55 @@ export default function Home() {
     ? analysis.overall.score >= 8 ? "#22c55e" : analysis.overall.score >= 6 ? "#f59e0b" : "#ef4444"
     : "#000";
 
+  const modeStyle = MODE_COLORS[usedMode];
+
   return (
     <main style={{ maxWidth: 760, margin: "48px auto", padding: "0 20px", fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 4 }}>Website Localization Reviewer</h1>
       <p style={{ color: "#6b7280", marginBottom: 24 }}>
-        Enter a URL and target language to get a quality report on the translation.
+        Analyze a single page or compare source and target URLs for a full translation review.
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://commission.europa.eu/index_de"
-          style={{ padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db" }}
-        />
-        <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-          <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
-          {(["ai", "mqm"] as const).map((m) => (
-            <label key={m} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
-              <input
-                type="radio"
-                name="mode"
-                value={m}
-                checked={mode === m}
-                onChange={() => setMode(m)}
-              />
-              {m === "ai" ? "AI Judgment" : "MQM Framework"}
-            </label>
-          ))}
+        <div>
+          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>
+            Target URL (translated page)
+          </label>
+          <input
+            type="url"
+            value={targetUrl}
+            onChange={(e) => setTargetUrl(e.target.value)}
+            placeholder="https://commission.europa.eu/index_de"
+            style={{ width: "100%", padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box" }}
+          />
         </div>
+        <div>
+          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>
+            Source URL (original language) — leave blank to analyze target only
+          </label>
+          <input
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://commission.europa.eu/index_en"
+            style={{ width: "100%", padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box" }}
+          />
+        </div>
+
+        {!isComparison && (
+          <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+            <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
+            {(["ai", "mqm"] as const).map((m) => (
+              <label key={m} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+                <input type="radio" name="mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
+                {m === "ai" ? "AI Judgment" : "MQM Framework"}
+              </label>
+            ))}
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <label htmlFor="lang">Page language:</label>
+          <label htmlFor="lang" style={{ fontSize: 14 }}>Target language:</label>
           <select
             id="lang"
             value={targetLanguage}
@@ -113,18 +147,18 @@ export default function Home() {
           </select>
           <button
             onClick={handleAnalyze}
-            disabled={isLoading || !url.trim()}
+            disabled={isLoading || !canAnalyze}
             style={{
               padding: "8px 24px",
               fontSize: 15,
               borderRadius: 4,
               border: "none",
-              background: isLoading || !url.trim() ? "#9ca3af" : "#0070f3",
+              background: isLoading || !canAnalyze ? "#9ca3af" : "#0070f3",
               color: "#fff",
               cursor: isLoading ? "wait" : "pointer",
             }}
           >
-            {isLoading ? "Analyzing…" : "Analyze"}
+            {isLoading ? "Analyzing…" : isComparison ? "Compare" : "Analyze"}
           </button>
         </div>
       </div>
@@ -151,11 +185,10 @@ export default function Home() {
                 <strong style={{ fontSize: 16 }}>Overall Score — {targetLanguage}</strong>
                 <span style={{
                   fontSize: 11, padding: "2px 8px", borderRadius: 12,
-                  background: usedMode === "mqm" ? "#dbeafe" : "#f3f4f6",
-                  color: usedMode === "mqm" ? "#1d4ed8" : "#6b7280",
+                  background: modeStyle.bg, color: modeStyle.text,
                   fontWeight: 600, textTransform: "uppercase",
                 }}>
-                  {usedMode === "mqm" ? "MQM" : "AI Judgment"}
+                  {MODE_LABELS[usedMode]}
                 </span>
               </div>
               <p style={{ margin: "4px 0 0", color: "#374151" }}>{analysis.overall.summary}</p>
