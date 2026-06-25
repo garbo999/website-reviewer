@@ -1,242 +1,236 @@
 "use client";
 
 import { useState } from "react";
-import { IssueList, type Analysis, DIMENSIONS } from "./components/IssueList";
-import { buildTextReport, buildFilename, download } from "./lib/export";
-import { saveReport } from "./lib/reports";
+import { IssueList, issueCount, type Analysis } from "../components/IssueList";
+import { buildCSV, buildMultiTextReport, buildFilename, download, type MultiRow } from "../lib/export";
+import { saveReport } from "../lib/reports";
 
-const LANGUAGES = [
-  "English", "German", "French", "Spanish", "Italian", "Portuguese",
-  "Dutch", "Polish", "Swedish", "Danish", "Finnish",
-  "Czech", "Romanian", "Hungarian", "Bulgarian", "Croatian",
-  "Japanese", "Chinese", "Arabic", "Korean", "Turkish",
+const EU_DEMO = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19_{lang}";
+
+const ALL_LANGUAGES = [
+  { name: "German",     code: "de", selected: true  },
+  { name: "French",     code: "fr", selected: true  },
+  { name: "Spanish",    code: "es", selected: true  },
+  { name: "Italian",    code: "it", selected: true  },
+  { name: "Dutch",      code: "nl", selected: true  },
+  { name: "Polish",     code: "pl", selected: false },
+  { name: "Portuguese", code: "pt", selected: false },
+  { name: "Romanian",   code: "ro", selected: false },
 ];
 
-const EU_BASE = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19";
+type RowStatus = "idle" | "loading" | "done" | "error";
+type Row = { name: string; code: string; status: RowStatus; analysis?: Analysis; error?: string };
 
-const DEMOS: { label: string; targetUrl: string; sourceUrl: string; targetLanguage: string; mode: "ai" | "mqm" }[] = [
-  { label: "German — MQM",      targetUrl: `${EU_BASE}_de`, sourceUrl: "",             targetLanguage: "German",  mode: "mqm" },
-  { label: "French — AI",       targetUrl: `${EU_BASE}_fr`, sourceUrl: "",             targetLanguage: "French",  mode: "ai"  },
-  { label: "Spanish — AI",      targetUrl: `${EU_BASE}_es`, sourceUrl: "",             targetLanguage: "Spanish", mode: "ai"  },
-  { label: "EN → DE comparison",targetUrl: `${EU_BASE}_de`, sourceUrl: `${EU_BASE}_en`,targetLanguage: "German",  mode: "ai"  },
-  { label: "EN → FR comparison",targetUrl: `${EU_BASE}_fr`, sourceUrl: `${EU_BASE}_en`,targetLanguage: "French",  mode: "ai"  },
-];
-
-type Mode = "ai" | "mqm" | "comparison";
-
-const MODE_LABELS: Record<Mode, string> = {
-  ai: "AI Judgment", mqm: "MQM", comparison: "Comparison",
-};
-
-const MODE_COLORS: Record<Mode, { bg: string; text: string }> = {
-  ai:         { bg: "#f3f4f6", text: "#6b7280" },
-  mqm:        { bg: "#dbeafe", text: "#1d4ed8" },
-  comparison: { bg: "#fef3c7", text: "#92400e" },
-};
-
-function scoreColor(s: number) {
-  return s >= 8 ? "#22c55e" : s >= 6 ? "#f59e0b" : "#ef4444";
+function scoreColor(score: number) {
+  return score >= 8 ? "#22c55e" : score >= 6 ? "#f59e0b" : "#ef4444";
 }
 
-function ScoreCard({ label, data }: { label: string; data: Analysis[typeof DIMENSIONS[number]] }) {
-  const issues = data.issues ?? [];
-  const hasCritical = issues.some((i) => i.severity === "Critical");
+function ScoreCell({ score }: { score: number }) {
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <strong style={{ fontSize: 15 }}>{label}</strong>
-        <span style={{ fontSize: 24, fontWeight: 700, color: scoreColor(data.score) }}>{data.score}/10</span>
-      </div>
-      <p style={{ margin: 0, fontSize: 14, color: "#374151" }}>{data.explanation}</p>
-      {issues.length > 0 && (
-        <p style={{ margin: "6px 0 0", fontSize: 12, color: hasCritical ? "#ef4444" : "#6b7280" }}>
-          {issues.length} issue{issues.length !== 1 ? "s" : ""} flagged
-        </p>
-      )}
-    </div>
+    <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600, color: scoreColor(score), fontSize: 15 }}>
+      {score.toFixed(1)}
+    </td>
   );
 }
 
-export default function Home() {
-  const [targetUrl, setTargetUrl]       = useState("");
-  const [sourceUrl, setSourceUrl]       = useState("");
-  const [targetLanguage, setTargetLanguage] = useState("German");
+const TH: React.CSSProperties = {
+  padding: "8px 12px", textAlign: "center", fontSize: 12, fontWeight: 600,
+  color: "#6b7280", textTransform: "uppercase", borderBottom: "2px solid #e5e7eb",
+  whiteSpace: "nowrap",
+};
+
+export default function Multi() {
+  const [template, setTemplate]         = useState(EU_DEMO);
+  const [languages, setLanguages]       = useState(ALL_LANGUAGES);
+  const [rows, setRows]                 = useState<Row[]>([]);
+  const [running, setRunning]           = useState(false);
   const [mode, setMode]                 = useState<"ai" | "mqm">("ai");
-  const [usedMode, setUsedMode]         = useState<Mode>("ai");
-  const [analysis, setAnalysis]         = useState<Analysis | null>(null);
-  const [isLoading, setIsLoading]       = useState(false);
-  const [error, setError]               = useState("");
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
-  const canAnalyze  = targetUrl.trim() || sourceUrl.trim();
-  const isComparison = targetUrl.trim() && sourceUrl.trim();
+  function toggleLang(code: string) {
+    setLanguages((prev) => prev.map((l) => l.code === code ? { ...l, selected: !l.selected } : l));
+  }
 
-  async function runAnalysis(tUrl: string, sUrl: string, lang: string, m: "ai" | "mqm") {
-    setIsLoading(true); setError(""); setAnalysis(null);
+  async function analyzeOne(lang: { name: string; code: string }): Promise<{ name: string; analysis: Analysis } | null> {
+    const url = template.replace("{lang}", lang.code);
+    setRows((prev) => prev.map((r) => r.code === lang.code ? { ...r, status: "loading" } : r));
     try {
       const res  = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: tUrl, sourceUrl: sUrl, targetLanguage: lang, mode: m }),
+        body: JSON.stringify({ url, sourceUrl: "", targetLanguage: lang.name, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
-      setUsedMode(data.mode ?? "ai");
-      setAnalysis(data.analysis);
-      saveReport({ type: "single", url: tUrl, sourceUrl: sUrl, language: lang, mode: data.mode ?? m, analysis: data.analysis });
+      setRows((prev) => prev.map((r) => r.code === lang.code ? { ...r, status: "done", analysis: data.analysis } : r));
+      return { name: lang.name, analysis: data.analysis };
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
+      setRows((prev) => prev.map((r) => r.code === lang.code
+        ? { ...r, status: "error", error: err instanceof Error ? err.message : "Failed" }
+        : r));
+      return null;
     }
   }
 
-  async function handleAnalyze() {
-    if (!canAnalyze) return;
-    await runAnalysis(targetUrl, sourceUrl, targetLanguage, mode);
+  async function handleRun() {
+    const selected = languages.filter((l) => l.selected);
+    if (!selected.length || !template.includes("{lang}")) return;
+    setRunning(true);
+    setSelectedCode(null);
+    setRows(selected.map((l) => ({ name: l.name, code: l.code, status: "idle" })));
+    const results = await Promise.all(selected.map((l) => analyzeOne(l)));
+    const successRows = results.filter(Boolean) as { name: string; analysis: Analysis }[];
+    if (successRows.length > 0) {
+      saveReport({ type: "multi", templateUrl: template, mode, rows: successRows });
+    }
+    setRunning(false);
   }
 
-  async function handleDemo(demo: typeof DEMOS[0]) {
-    setTargetUrl(demo.targetUrl); setSourceUrl(demo.sourceUrl);
-    setTargetLanguage(demo.targetLanguage); setMode(demo.mode);
-    await runAnalysis(demo.targetUrl, demo.sourceUrl, demo.targetLanguage, demo.mode);
-  }
-
-  const overallColor = analysis ? scoreColor(analysis.overall.score) : "#000";
-  const modeStyle    = MODE_COLORS[usedMode];
+  const selected    = languages.filter((l) => l.selected);
+  const doneCount   = rows.filter((r) => r.status === "done" || r.status === "error").length;
+  const selectedRow = rows.find((r) => r.code === selectedCode && r.status === "done");
 
   return (
-    <main style={{ maxWidth: 760, margin: "48px auto", padding: "0 20px", fontFamily: "sans-serif" }}>
-      <h1 style={{ marginBottom: 4 }}>Website Localization Reviewer</h1>
-      <p style={{ color: "#6b7280", marginBottom: 16 }}>
-        Analyze a single page or compare source and target URLs for a full translation review.
+    <main style={{ maxWidth: 820, margin: "40px auto", padding: "0 20px", fontFamily: "sans-serif" }}>
+      <h1 style={{ marginBottom: 4 }}>Multi-language Analysis</h1>
+      <p style={{ color: "#6b7280", marginBottom: 28 }}>
+        Analyze the same page across multiple languages and compare quality scores at a glance.
+        Use <code style={{ background: "#f3f4f6", padding: "1px 5px", borderRadius: 3 }}>{"{lang}"}</code> in
+        the URL where the language code appears.
       </p>
 
-      <div style={{ marginBottom: 24 }}>
-        <span style={{ fontSize: 13, color: "#6b7280", marginRight: 10 }}>Try a demo:</span>
-        {DEMOS.map((demo) => (
-          <button key={demo.label} onClick={() => handleDemo(demo)} disabled={isLoading} style={{
-            marginRight: 8, marginBottom: 8, padding: "4px 12px", fontSize: 13,
-            borderRadius: 16, border: "1px solid #d1d5db", background: "#f9fafb",
-            color: "#374151", cursor: isLoading ? "wait" : "pointer",
-          }}>
-            {demo.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24 }}>
         <div>
-          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>Target URL (translated page)</label>
-          <input type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)}
-            placeholder="https://commission.europa.eu/index_de"
-            style={{ width: "100%", padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box" }} />
-        </div>
-        <div>
-          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>
-            Source URL (original language) — leave blank to analyze target only
-          </label>
-          <input type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)}
-            placeholder="https://commission.europa.eu/index_en"
-            style={{ width: "100%", padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box" }} />
+          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>URL template</label>
+          <input type="text" value={template} onChange={(e) => setTemplate(e.target.value)}
+            style={{ width: "100%", padding: 10, fontSize: 14, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box", fontFamily: "monospace" }} />
         </div>
 
-        {isComparison && (
-          <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-            Note: For accurate comparison, source and target pages should be translations of the same content.
-          </p>
-        )}
-
-        {!isComparison && (
-          <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-            <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
-            {(["ai", "mqm"] as const).map((m) => (
-              <label key={m} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
-                <input type="radio" name="mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
-                {m === "ai" ? "AI Judgment" : "MQM Framework"}
+        <div>
+          <span style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 8 }}>Languages</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {languages.map((l) => (
+              <label key={l.code} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
+                <input type="checkbox" checked={l.selected} onChange={() => toggleLang(l.code)} />
+                {l.name}
               </label>
             ))}
           </div>
-        )}
+        </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <label htmlFor="lang" style={{ fontSize: 14 }}>Target language:</label>
-          <select id="lang" value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)}
-            style={{ padding: "6px 10px", fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db" }}>
-            {LANGUAGES.map((l) => <option key={l}>{l}</option>)}
-          </select>
-          <button onClick={handleAnalyze} disabled={isLoading || !canAnalyze} style={{
-            padding: "8px 24px", fontSize: 15, borderRadius: 4, border: "none",
-            background: isLoading || !canAnalyze ? "#9ca3af" : "#0070f3",
-            color: "#fff", cursor: isLoading ? "wait" : "pointer",
+        <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+          <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
+          {(["ai", "mqm"] as const).map((m) => (
+            <label key={m} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+              <input type="radio" name="multi-mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
+              {m === "ai" ? "AI Judgment" : "MQM Framework"}
+            </label>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <button onClick={handleRun} disabled={running || !selected.length || !template.includes("{lang}")} style={{
+            padding: "8px 28px", fontSize: 15, borderRadius: 4, border: "none",
+            background: running || !selected.length ? "#9ca3af" : "#0070f3",
+            color: "#fff", cursor: running ? "wait" : "pointer",
           }}>
-            {isLoading ? "Analyzing…" : isComparison ? "Compare" : "Analyze"}
+            {running ? `Analyzing… (${doneCount}/${selected.length})` : "Analyze All"}
           </button>
-          {!canAnalyze && !isLoading && (
-            <span style={{ fontSize: 13, color: "#9ca3af" }}>
-              ← Enter a URL, or try a demo above
-            </span>
+          {!template.includes("{lang}") && (
+            <span style={{ fontSize: 13, color: "#ef4444" }}>URL must contain {"{lang}"}</span>
           )}
         </div>
       </div>
 
-      {error && <p style={{ color: "#ef4444" }}>{error}</p>}
-
-      {analysis && (
-        <div>
-          <div style={{
-            background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8,
-            padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 20,
-          }}>
-            <div style={{ fontSize: 48, fontWeight: 700, color: overallColor }}>
-              {analysis.overall.score}/10
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
-                <strong style={{ fontSize: 16 }}>Overall Score — {targetLanguage}</strong>
-                <span style={{
-                  fontSize: 11, padding: "2px 8px", borderRadius: 12,
-                  background: modeStyle.bg, color: modeStyle.text,
-                  fontWeight: 600, textTransform: "uppercase",
-                }}>
-                  {MODE_LABELS[usedMode]}
-                </span>
-                <button
-                  onClick={() => {
-                    const report = buildTextReport(analysis!, targetLanguage, usedMode, targetUrl, sourceUrl);
-                    const slug = targetLanguage.toLowerCase().replace(/\s+/g, "-");
-                    download(buildFilename(`localization-review-${slug}`, "txt"), report, "text/plain");
-                  }}
-                  style={{ marginLeft: "auto", padding: "3px 10px", fontSize: 12, borderRadius: 4, border: "1px solid #bbf7d0", background: "#fff", cursor: "pointer", color: "#374151" }}
-                >
-                  ↓ Export report
-                </button>
-              </div>
-              <p style={{ margin: "4px 0 0", color: "#374151" }}>{analysis.overall.summary}</p>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <ScoreCard label="Linguistic Quality"      data={analysis.linguistic_quality} />
-            <ScoreCard label="Terminology Consistency" data={analysis.terminology_consistency} />
-            <ScoreCard label="Cultural Adaptation"     data={analysis.cultural_adaptation} />
-            <ScoreCard label="Completeness"            data={analysis.completeness} />
-          </div>
-
-          <IssueList analysis={analysis} />
-
-          <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #e5e7eb" }}>
+      {rows.length > 0 && (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
             <button
               onClick={() => {
-                const report = buildTextReport(analysis!, targetLanguage, usedMode, targetUrl, sourceUrl);
-                const slug = targetLanguage.toLowerCase().replace(/\s+/g, "-");
-                download(buildFilename(`localization-review-${slug}`, "txt"), report, "text/plain");
+                const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
+                const report = buildMultiTextReport(doneRows, template.replace("_{lang}", ""), mode);
+                download(buildFilename("localization-review-multi", "txt"), report, "text/plain");
               }}
-              style={{ padding: "8px 20px", fontSize: 14, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
+              style={{ padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
             >
-              ↓ Export report (.txt)
+              ↓ Export full report (.txt)
+            </button>
+            <button
+              onClick={() => {
+                const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
+                const csv = buildCSV(doneRows);
+                download(buildFilename("localization-review-multi", "csv"), csv, "text/csv");
+              }}
+              style={{ padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
+            >
+              ↓ Export scores (.csv)
             </button>
           </div>
-        </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: "#f9fafb" }}>
+                  <th style={{ ...TH, textAlign: "left", paddingLeft: 16 }}>Language</th>
+                  <th style={TH}>Overall</th>
+                  <th style={TH}>Linguistic</th>
+                  <th style={TH}>Terminology</th>
+                  <th style={TH}>Cultural</th>
+                  <th style={TH}>Completeness</th>
+                  <th style={TH}>Issues</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => {
+                  const isSelected = row.code === selectedCode;
+                  const isClickable = row.status === "done";
+                  return (
+                    <tr key={row.code}
+                      onClick={() => isClickable && setSelectedCode(isSelected ? null : row.code)}
+                      style={{
+                        borderBottom: "1px solid #f3f4f6",
+                        background: isSelected ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa",
+                        cursor: isClickable ? "pointer" : "default",
+                      }}
+                    >
+                      <td style={{ padding: "10px 16px", fontWeight: 500 }}>{row.name}</td>
+                      {row.status === "loading" || row.status === "idle" ? (
+                        <td colSpan={6} style={{ padding: "10px 12px", color: "#9ca3af", fontSize: 13 }}>
+                          {row.status === "loading" ? "Analyzing…" : "Waiting…"}
+                        </td>
+                      ) : row.status === "error" ? (
+                        <td colSpan={6} style={{ padding: "10px 12px", color: "#ef4444", fontSize: 13 }}>
+                          {row.error}
+                        </td>
+                      ) : row.analysis ? (
+                        <>
+                          <ScoreCell score={row.analysis.overall.score} />
+                          <ScoreCell score={row.analysis.linguistic_quality.score} />
+                          <ScoreCell score={row.analysis.terminology_consistency.score} />
+                          <ScoreCell score={row.analysis.cultural_adaptation.score} />
+                          <ScoreCell score={row.analysis.completeness.score} />
+                          <td style={{ padding: "10px 12px", textAlign: "center", color: "#6b7280", fontSize: 13 }}>
+                            {issueCount(row.analysis)}
+                          </td>
+                        </>
+                      ) : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {rows.some((r) => r.status === "done") && !selectedRow && (
+            <p style={{ marginTop: 12, fontSize: 13, color: "#9ca3af", textAlign: "center" }}>
+              Click a row to see its flagged issues
+            </p>
+          )}
+
+          {selectedRow?.analysis && (
+            <IssueList analysis={selectedRow.analysis} heading={selectedRow.name} />
+          )}
+        </>
       )}
     </main>
   );
