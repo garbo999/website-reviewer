@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { IssueList, issueCount, type Analysis } from "../components/IssueList";
 import { buildCSV, buildMultiTextReport, buildFilename, download, type MultiRow } from "../lib/export";
+import { saveReport } from "../lib/reports";
 
 const EU_DEMO = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19_{lang}";
 
@@ -39,18 +40,18 @@ const TH: React.CSSProperties = {
 };
 
 export default function Multi() {
-  const [template, setTemplate]   = useState(EU_DEMO);
-  const [languages, setLanguages] = useState(ALL_LANGUAGES);
-  const [rows, setRows]           = useState<Row[]>([]);
-  const [running, setRunning]     = useState(false);
-  const [mode, setMode]           = useState<"ai" | "mqm">("ai");
+  const [template, setTemplate]         = useState(EU_DEMO);
+  const [languages, setLanguages]       = useState(ALL_LANGUAGES);
+  const [rows, setRows]                 = useState<Row[]>([]);
+  const [running, setRunning]           = useState(false);
+  const [mode, setMode]                 = useState<"ai" | "mqm">("ai");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
   function toggleLang(code: string) {
     setLanguages((prev) => prev.map((l) => l.code === code ? { ...l, selected: !l.selected } : l));
   }
 
-  async function analyzeOne(lang: { name: string; code: string }) {
+  async function analyzeOne(lang: { name: string; code: string }): Promise<{ name: string; analysis: Analysis } | null> {
     const url = template.replace("{lang}", lang.code);
     setRows((prev) => prev.map((r) => r.code === lang.code ? { ...r, status: "loading" } : r));
     try {
@@ -62,10 +63,12 @@ export default function Multi() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       setRows((prev) => prev.map((r) => r.code === lang.code ? { ...r, status: "done", analysis: data.analysis } : r));
+      return { name: lang.name, analysis: data.analysis };
     } catch (err) {
       setRows((prev) => prev.map((r) => r.code === lang.code
         ? { ...r, status: "error", error: err instanceof Error ? err.message : "Failed" }
         : r));
+      return null;
     }
   }
 
@@ -75,7 +78,11 @@ export default function Multi() {
     setRunning(true);
     setSelectedCode(null);
     setRows(selected.map((l) => ({ name: l.name, code: l.code, status: "idle" })));
-    await Promise.all(selected.map((l) => analyzeOne(l)));
+    const results = await Promise.all(selected.map((l) => analyzeOne(l)));
+    const successRows = results.filter(Boolean) as { name: string; analysis: Analysis }[];
+    if (successRows.length > 0) {
+      saveReport({ type: "multi", templateUrl: template, mode, rows: successRows });
+    }
     setRunning(false);
   }
 
@@ -178,8 +185,7 @@ export default function Multi() {
                   const isSelected = row.code === selectedCode;
                   const isClickable = row.status === "done";
                   return (
-                    <tr
-                      key={row.code}
+                    <tr key={row.code}
                       onClick={() => isClickable && setSelectedCode(isSelected ? null : row.code)}
                       style={{
                         borderBottom: "1px solid #f3f4f6",

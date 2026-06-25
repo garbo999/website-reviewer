@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { IssueList, type Analysis, DIMENSIONS } from "./components/IssueList";
 import { buildTextReport, buildFilename, download } from "./lib/export";
+import { saveReport } from "./lib/reports";
 
 const LANGUAGES = [
   "English", "German", "French", "Spanish", "Italian", "Portuguese",
@@ -81,6 +82,7 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "Analysis failed");
       setUsedMode(data.mode ?? "ai");
       setAnalysis(data.analysis);
+      saveReport({ type: "single", url: tUrl, sourceUrl: sUrl, language: lang, mode: data.mode ?? m, analysis: data.analysis });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
