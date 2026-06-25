@@ -54,7 +54,7 @@ export function buildTextReport(
   return lines.join("\n");
 }
 
-type MultiRow = { name: string; analysis: Analysis };
+export type MultiRow = { name: string; analysis: Analysis };
 
 export function buildCSV(rows: MultiRow[]): string {
   const header = ["Language", "Overall", "Linguistic Quality", "Terminology Consistency", "Cultural Adaptation", "Completeness", "Total Issues"];
@@ -68,6 +68,61 @@ export function buildCSV(rows: MultiRow[]): string {
     issueCount(r.analysis).toString(),
   ]);
   return [header, ...dataRows].map((row) => row.join(",")).join("\n");
+}
+
+export function buildMultiTextReport(rows: MultiRow[], url: string, mode: string): string {
+  const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const modeLabel = mode === "mqm" ? "MQM Framework" : "AI Judgment";
+
+  const lines: string[] = [
+    "MULTI-LANGUAGE LOCALIZATION REVIEW REPORT",
+    "==========================================",
+    `Generated:  ${date}`,
+    `Mode:       ${modeLabel}`,
+    `URL:        ${url}`,
+    "",
+    "SCORES SUMMARY",
+    "-".repeat(70),
+    `${"Language".padEnd(16)}${"Overall".padEnd(10)}${"Linguistic".padEnd(13)}${"Terminology".padEnd(14)}${"Cultural".padEnd(12)}${"Complete".padEnd(11)}Issues`,
+    "-".repeat(70),
+  ];
+
+  for (const r of rows) {
+    const a = r.analysis;
+    lines.push(
+      `${r.name.padEnd(16)}${String(a.overall.score).padEnd(10)}${String(a.linguistic_quality.score).padEnd(13)}${String(a.terminology_consistency.score).padEnd(14)}${String(a.cultural_adaptation.score).padEnd(12)}${String(a.completeness.score).padEnd(11)}${issueCount(a)}`
+    );
+  }
+
+  for (const r of rows) {
+    lines.push("", "=".repeat(70), `${r.name.toUpperCase()} — ${r.analysis.overall.score}/10`, "=".repeat(70));
+    lines.push(r.analysis.overall.summary);
+
+    lines.push("", "Dimension Scores", "-".repeat(30));
+    for (const dim of DIMENSIONS) {
+      const d = r.analysis[dim];
+      lines.push(`${pad(DIMENSION_LABELS[dim])} ${d.score}/10`);
+      lines.push(`  ${d.explanation}`);
+    }
+
+    const allIssues = DIMENSIONS.flatMap((dim) =>
+      (r.analysis[dim].issues ?? []).map((issue) => ({ ...issue, dimension: dim }))
+    ).sort((a, b) => ({ Critical: 0, Major: 1, Minor: 2 }[a.severity] ?? 3) - ({ Critical: 0, Major: 1, Minor: 2 }[b.severity] ?? 3));
+
+    lines.push("", `Flagged Issues (${allIssues.length})`, "-".repeat(30));
+    if (allIssues.length === 0) {
+      lines.push("No issues found.");
+    } else {
+      for (const issue of allIssues) {
+        lines.push(`\n[${issue.severity.toUpperCase()}] ${DIMENSION_LABELS[issue.dimension]}`);
+        if (issue.quote) lines.push(`  "${issue.quote}"`);
+        lines.push(`  ${issue.note}`);
+      }
+    }
+  }
+
+  lines.push(FOOTER);
+  return lines.join("\n");
 }
 
 export function download(filename: string, content: string, mime: string) {

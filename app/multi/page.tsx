@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { IssueList, issueCount, type Analysis } from "../components/IssueList";
-import { buildCSV, download } from "../lib/export";
+import { buildCSV, buildMultiTextReport, download, type MultiRow } from "../lib/export";
 
 const EU_DEMO = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19_{lang}";
 
@@ -137,16 +137,26 @@ export default function Multi() {
 
       {rows.length > 0 && (
         <>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
             <button
               onClick={() => {
-                const doneRows = rows.filter((r) => r.status === "done" && r.analysis);
-                const csv = buildCSV(doneRows as { name: string; analysis: Analysis }[]);
+                const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
+                const report = buildMultiTextReport(doneRows, template.replace("_{lang}", ""), mode);
+                download("localization-review-multi.txt", report, "text/plain");
+              }}
+              style={{ padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
+            >
+              ↓ Export full report (.txt)
+            </button>
+            <button
+              onClick={() => {
+                const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
+                const csv = buildCSV(doneRows);
                 download("localization-review-multi.csv", csv, "text/csv");
               }}
               style={{ padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
             >
-              Export CSV
+              ↓ Export scores (.csv)
             </button>
           </div>
 
