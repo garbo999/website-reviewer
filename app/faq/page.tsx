@@ -1,7 +1,7 @@
 const QA = [
   {
     q: "What does this tool do?",
-    a: "The Website Localization Reviewer analyzes translated web pages and scores them across four dimensions: Linguistic Quality, Terminology Consistency, Cultural Adaptation, and Completeness. It generates an instant quality report without requiring the reviewer to read the target language.",
+    a: "The Website Localization Reviewer analyzes translated web pages and scores them across four dimensions: Linguistic Quality, Terminology Consistency, Cultural Adaptation, and Completeness. It generates an instant quality report including a prioritized list of specific flagged issues, without requiring the reviewer to read the target language. It can also analyze the same page across multiple languages simultaneously and export results as a text report or CSV.",
   },
   {
     q: "Who is it for?",
@@ -9,7 +9,7 @@ const QA = [
   },
   {
     q: "How do I use it?",
-    a: "Paste the URL of a translated page and click Analyze. For a deeper review, also provide the source URL — the tool will compare them directly, catching omissions and mistranslations that are invisible from the target alone. Or click one of the demo buttons to see it in action immediately.",
+    a: "Paste the URL of a translated page and click Analyze. For a deeper review, also provide the source URL — the tool will compare them directly, catching omissions and mistranslations that are invisible from the target alone. Use the Multi-language tab to analyze the same page in several languages at once. Or click one of the demo buttons to see it in action immediately.",
   },
   {
     q: "What are the three analysis modes?",
@@ -18,6 +18,18 @@ const QA = [
       { label: "MQM Framework", desc: "The industry-standard Multidimensional Quality Metrics framework. Errors are classified as Critical (−25), Major (−5), or Minor (−1), and the score is calculated from the total penalty." },
       { label: "Comparison", desc: "Provide both a source and target URL. The tool compares them directly, flagging omissions, additions, and semantic shifts invisible from the target alone." },
     ],
+  },
+  {
+    q: "What is the Flagged Issues list?",
+    a: "Below the dimension score cards, the tool lists every specific problem it found across all four dimensions, ranked by severity — Critical first, then Major, then Minor. Each entry includes a quoted excerpt from the page and a one-sentence explanation of why it is an error. This list can be copied directly into a correction brief for a language vendor.",
+  },
+  {
+    q: "Can I analyze multiple languages at once?",
+    a: "Yes — use the Multi-language tab. Enter a URL template with {lang} where the language code appears (the EU Commission demo is pre-loaded), select the languages you want, and click Analyze All. Results appear in a comparison table as each language completes. Click any row to see its detailed flagged issues.",
+  },
+  {
+    q: "Can I export the results?",
+    a: "Yes. On the Analyzer tab, click '↓ Export report (.txt)' at the bottom of the results for a full text report including scores, explanations, and all flagged issues. On the Multi-language tab, use '↓ Export full report (.txt)' for a complete per-language breakdown, or '↓ Export scores (.csv)' for the scores table in spreadsheet format. Files are named with an ISO date and serial number for easy filing.",
   },
   {
     q: "What sites work well?",
