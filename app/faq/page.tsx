@@ -25,7 +25,7 @@ const QA = [
   },
   {
     q: "Can I analyze multiple languages at once?",
-    a: "Yes — use the Multi-language tab. Enter a URL template with {lang} where the language code appears (the EU Commission demo is pre-loaded), select the languages you want, and click Analyze All. Results appear in a comparison table as each language completes. Click any row to see its detailed flagged issues.",
+    a: "Yes — use the Multi-language tab. Enter a URL and target language for each language version of the same page, then click Analyze All. Click 'Load EU Commission example' to see it pre-filled with five languages. Results appear in a comparison table as each language completes. Click any row to see its detailed flagged issues.",
   },
   {
     q: "Can I export the results?",
@@ -44,8 +44,9 @@ const QA = [
     a: "AI Judgment and Comparison modes involve qualitative assessment, which has inherent variability. MQM mode is more consistent because it follows a fixed error-classification and penalty formula.",
   },
   {
-    q: "What's planned?",
+    q: "Further development ideas",
     items: [
+      { label: "API access", desc: "A REST API so the reviewer can be integrated into CI/CD pipelines, CMS workflows, or translation management systems for automated quality gates." },
       { label: "Rule-based grammar checking", desc: "LanguageTool integration for a fully deterministic Linguistic Quality score." },
       { label: "Paste text mode", desc: "Analyze content that isn't publicly accessible — staging environments, protected pages, or raw translation output." },
       { label: "Multi-page crawl", desc: "Analyze a full site section rather than a single page." },
