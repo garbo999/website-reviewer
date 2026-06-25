@@ -48,6 +48,7 @@ const QA = [
     bullets: true,
     items: [
       { label: "API access", desc: "A REST API so the reviewer can be integrated into CI/CD pipelines, CMS workflows, or translation management systems for automated quality gates." },
+      { label: "MQM benchmark validation", desc: "Cross-reference AI-generated MQM scores against human-annotated gold standard datasets (such as the MQM Translation Quality dataset on HuggingFace) to measure and improve scoring accuracy." },
       { label: "Rule-based grammar checking", desc: "LanguageTool integration for a fully deterministic Linguistic Quality score." },
       { label: "Paste text mode", desc: "Analyze content that isn't publicly accessible — staging environments, protected pages, or raw translation output." },
       { label: "Multi-page crawl", desc: "Analyze a full site section rather than a single page." },
