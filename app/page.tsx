@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IssueList, type Analysis, DIMENSIONS } from "./components/IssueList";
+import { buildTextReport, download } from "./lib/export";
 
 const LANGUAGES = [
   "English", "German", "French", "Spanish", "Italian", "Portuguese",
@@ -192,6 +193,16 @@ export default function Home() {
                 }}>
                   {MODE_LABELS[usedMode]}
                 </span>
+                <button
+                  onClick={() => {
+                    const report = buildTextReport(analysis!, targetLanguage, usedMode, targetUrl, sourceUrl);
+                    const slug = targetLanguage.toLowerCase().replace(/\s+/g, "-");
+                    download(`localization-review-${slug}.txt`, report, "text/plain");
+                  }}
+                  style={{ marginLeft: "auto", padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
+                >
+                  Export report
+                </button>
               </div>
               <p style={{ margin: "4px 0 0", color: "#374151" }}>{analysis.overall.summary}</p>
             </div>
