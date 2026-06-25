@@ -31,7 +31,7 @@ export function getReports(): SavedReport[] {
   } catch { return []; }
 }
 
-export function saveReport(data: Omit<SavedReport, "id" | "savedAt">): void {
+export function saveReport(data: Omit<SingleReport, "id" | "savedAt"> | Omit<MultiReport, "id" | "savedAt">): void {
   const reports = getReports();
   reports.unshift({ ...data, id: Date.now().toString(), savedAt: new Date().toISOString() } as SavedReport);
   try {
