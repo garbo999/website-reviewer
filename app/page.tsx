@@ -5,21 +5,31 @@ import { IssueList, issueCount, type Analysis } from "./components/IssueList";
 import { buildCSV, buildMultiTextReport, buildFilename, download, type MultiRow } from "./lib/export";
 import { saveReport } from "./lib/reports";
 
-const EU_DEMO = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19_{lang}";
-
-const ALL_LANGUAGES = [
-  { name: "German",     code: "de", selected: true  },
-  { name: "French",     code: "fr", selected: true  },
-  { name: "Spanish",    code: "es", selected: true  },
-  { name: "Italian",    code: "it", selected: true  },
-  { name: "Dutch",      code: "nl", selected: true  },
-  { name: "Polish",     code: "pl", selected: false },
-  { name: "Portuguese", code: "pt", selected: false },
-  { name: "Romanian",   code: "ro", selected: false },
+const LANGUAGE_OPTIONS = [
+  "Arabic", "Bulgarian", "Chinese", "Croatian", "Czech", "Danish", "Dutch",
+  "English", "Estonian", "Finnish", "French", "German", "Hungarian", "Italian",
+  "Japanese", "Korean", "Polish", "Portuguese", "Romanian", "Spanish", "Swedish", "Turkish",
 ];
 
+const EU_BASE = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19";
+
+const EU_DEMO_DATA = [
+  { name: "German",  url: `${EU_BASE}_de` },
+  { name: "French",  url: `${EU_BASE}_fr` },
+  { name: "Spanish", url: `${EU_BASE}_es` },
+  { name: "Italian", url: `${EU_BASE}_it` },
+  { name: "Dutch",   url: `${EU_BASE}_nl` },
+];
+
+type LangRow   = { id: string; name: string; url: string };
 type RowStatus = "idle" | "loading" | "done" | "error";
-type Row = { name: string; code: string; status: RowStatus; analysis?: Analysis; error?: string };
+type ResultRow = { id: string; name: string; status: RowStatus; analysis?: Analysis; error?: string };
+
+let _id = 0;
+function uid() { return String(++_id); }
+function makeRows(data: { name: string; url: string }[]): LangRow[] {
+  return data.map((d) => ({ id: uid(), name: d.name, url: d.url }));
+}
 
 function scoreColor(score: number) {
   return score >= 8 ? "#22c55e" : score >= 6 ? "#f59e0b" : "#ef4444";
@@ -40,32 +50,48 @@ const TH: React.CSSProperties = {
 };
 
 export default function Multi() {
-  const [template, setTemplate]         = useState(EU_DEMO);
-  const [languages, setLanguages]       = useState(ALL_LANGUAGES);
-  const [rows, setRows]                 = useState<Row[]>([]);
-  const [running, setRunning]           = useState(false);
-  const [mode, setMode]                 = useState<"ai" | "mqm">("ai");
-  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [langRows, setLangRows]   = useState<LangRow[]>(() => [
+    { id: uid(), name: "", url: "" },
+    { id: uid(), name: "", url: "" },
+    { id: uid(), name: "", url: "" },
+  ]);
+  const [results, setResults]     = useState<ResultRow[]>([]);
+  const [running, setRunning]     = useState(false);
+  const [mode, setMode]           = useState<"ai" | "mqm">("ai");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  function toggleLang(code: string) {
-    setLanguages((prev) => prev.map((l) => l.code === code ? { ...l, selected: !l.selected } : l));
+  function updateRow(id: string, field: keyof LangRow, value: string) {
+    setLangRows((prev) => prev.map((r) => r.id === id ? { ...r, [field]: value } : r));
   }
 
-  async function analyzeOne(lang: { name: string; code: string }): Promise<{ name: string; analysis: Analysis } | null> {
-    const url = template.replace("{lang}", lang.code);
-    setRows((prev) => prev.map((r) => r.code === lang.code ? { ...r, status: "loading" } : r));
+  function removeRow(id: string) {
+    setLangRows((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  function addRow() {
+    setLangRows((prev) => [...prev, { id: uid(), name: "", url: "" }]);
+  }
+
+  function loadEUDemo() {
+    setLangRows(makeRows(EU_DEMO_DATA));
+    setResults([]);
+    setSelectedId(null);
+  }
+
+  async function analyzeOne(row: LangRow): Promise<{ name: string; analysis: Analysis } | null> {
+    setResults((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "loading" } : r));
     try {
       const res  = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, sourceUrl: "", targetLanguage: lang.name, mode }),
+        body: JSON.stringify({ url: row.url, sourceUrl: "", targetLanguage: row.name, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
-      setRows((prev) => prev.map((r) => r.code === lang.code ? { ...r, status: "done", analysis: data.analysis } : r));
-      return { name: lang.name, analysis: data.analysis };
+      setResults((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "done", analysis: data.analysis } : r));
+      return { name: row.name, analysis: data.analysis };
     } catch (err) {
-      setRows((prev) => prev.map((r) => r.code === lang.code
+      setResults((prev) => prev.map((r) => r.id === row.id
         ? { ...r, status: "error", error: err instanceof Error ? err.message : "Failed" }
         : r));
       return null;
@@ -73,51 +99,85 @@ export default function Multi() {
   }
 
   async function handleRun() {
-    const selected = languages.filter((l) => l.selected);
-    if (!selected.length || !template.includes("{lang}")) return;
+    const valid = langRows.filter((r) => r.name.trim() && r.url.trim());
+    if (!valid.length) return;
     setRunning(true);
-    setSelectedCode(null);
-    setRows(selected.map((l) => ({ name: l.name, code: l.code, status: "idle" })));
-    const results = await Promise.all(selected.map((l) => analyzeOne(l)));
+    setSelectedId(null);
+    setResults(valid.map((r) => ({ id: r.id, name: r.name, status: "idle" })));
+    const results = await Promise.all(valid.map((r) => analyzeOne(r)));
     const successRows = results.filter(Boolean) as { name: string; analysis: Analysis }[];
     if (successRows.length > 0) {
-      saveReport({ type: "multi", templateUrl: template, mode, rows: successRows });
+      saveReport({ type: "multi", templateUrl: "", mode, rows: successRows });
     }
     setRunning(false);
   }
 
-  const selected    = languages.filter((l) => l.selected);
-  const doneCount   = rows.filter((r) => r.status === "done" || r.status === "error").length;
-  const selectedRow = rows.find((r) => r.code === selectedCode && r.status === "done");
+  const valid        = langRows.filter((r) => r.name.trim() && r.url.trim());
+  const doneCount    = results.filter((r) => r.status === "done" || r.status === "error").length;
+  const selectedResult = results.find((r) => r.id === selectedId && r.status === "done");
 
   return (
     <main style={{ maxWidth: 820, margin: "40px auto", padding: "0 20px", fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 4 }}>Multi-language Analysis</h1>
-      <p style={{ color: "#6b7280", marginBottom: 28 }}>
-        Analyze the same page across multiple languages and compare quality scores at a glance.
-        Use <code style={{ background: "#f3f4f6", padding: "1px 5px", borderRadius: 3 }}>{"{lang}"}</code> in
-        the URL where the language code appears.
+      <p style={{ color: "#6b7280", marginBottom: 20 }}>
+        Enter a URL for each language version of the same page to compare quality scores at a glance.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24 }}>
-        <div>
-          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>URL template</label>
-          <input type="text" value={template} onChange={(e) => setTemplate(e.target.value)}
-            style={{ width: "100%", padding: 10, fontSize: 14, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box", fontFamily: "monospace" }} />
-        </div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <button onClick={loadEUDemo} style={{
+          padding: "5px 14px", fontSize: 13, borderRadius: 4,
+          border: "1px solid #d1d5db", background: "#f9fafb",
+          cursor: "pointer", color: "#374151",
+        }}>
+          Load EU Commission example
+        </button>
+        <button onClick={addRow} style={{
+          padding: "5px 14px", fontSize: 13, borderRadius: 4,
+          border: "1px solid #0070f3", background: "#fff",
+          cursor: "pointer", color: "#0070f3",
+        }}>
+          + Add language
+        </button>
+      </div>
 
-        <div>
-          <span style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 8 }}>Languages</span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {languages.map((l) => (
-              <label key={l.code} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
-                <input type="checkbox" checked={l.selected} onChange={() => toggleLang(l.code)} />
-                {l.name}
-              </label>
-            ))}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+        {langRows.map((row) => (
+          <div key={row.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select
+              value={row.name}
+              onChange={(e) => updateRow(row.id, "name", e.target.value)}
+              style={{ padding: "7px 10px", fontSize: 14, borderRadius: 4, border: "1px solid #d1d5db", minWidth: 130 }}
+            >
+              <option value="">Language…</option>
+              {LANGUAGE_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+            <input
+              type="url"
+              value={row.url}
+              onChange={(e) => updateRow(row.id, "url", e.target.value)}
+              placeholder="https://example.com/page-in-this-language"
+              style={{
+                flex: 1, padding: "7px 10px", fontSize: 13, borderRadius: 4,
+                border: "1px solid #d1d5db", fontFamily: "monospace",
+              }}
+            />
+            <button
+              onClick={() => removeRow(row.id)}
+              disabled={langRows.length <= 1}
+              style={{
+                padding: "4px 10px", fontSize: 16, borderRadius: 4,
+                border: "1px solid #fca5a5", background: "#fff",
+                color: "#ef4444", cursor: langRows.length <= 1 ? "default" : "pointer",
+                opacity: langRows.length <= 1 ? 0.4 : 1,
+              }}
+            >
+              ×
+            </button>
           </div>
-        </div>
+        ))}
+      </div>
 
+      <div style={{ display: "flex", gap: 24, alignItems: "center", marginBottom: 24, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
           <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
           {(["ai", "mqm"] as const).map((m) => (
@@ -127,28 +187,22 @@ export default function Multi() {
             </label>
           ))}
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <button onClick={handleRun} disabled={running || !selected.length || !template.includes("{lang}")} style={{
-            padding: "8px 28px", fontSize: 15, borderRadius: 4, border: "none",
-            background: running || !selected.length ? "#9ca3af" : "#0070f3",
-            color: "#fff", cursor: running ? "wait" : "pointer",
-          }}>
-            {running ? `Analyzing… (${doneCount}/${selected.length})` : "Analyze All"}
-          </button>
-          {!template.includes("{lang}") && (
-            <span style={{ fontSize: 13, color: "#ef4444" }}>URL must contain {"{lang}"}</span>
-          )}
-        </div>
+        <button onClick={handleRun} disabled={running || valid.length === 0} style={{
+          padding: "8px 28px", fontSize: 15, borderRadius: 4, border: "none",
+          background: running || valid.length === 0 ? "#9ca3af" : "#0070f3",
+          color: "#fff", cursor: running ? "wait" : "pointer",
+        }}>
+          {running ? `Analyzing… (${doneCount}/${valid.length})` : "Analyze All"}
+        </button>
       </div>
 
-      {rows.length > 0 && (
+      {results.length > 0 && (
         <>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
             <button
               onClick={() => {
-                const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
-                const report = buildMultiTextReport(doneRows, template.replace("_{lang}", ""), mode);
+                const doneRows = results.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
+                const report = buildMultiTextReport(doneRows, "", mode);
                 download(buildFilename("localization-review-multi", "txt"), report, "text/plain");
               }}
               style={{ padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
@@ -157,7 +211,7 @@ export default function Multi() {
             </button>
             <button
               onClick={() => {
-                const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
+                const doneRows = results.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
                 const csv = buildCSV(doneRows);
                 download(buildFilename("localization-review-multi", "csv"), csv, "text/csv");
               }}
@@ -181,12 +235,12 @@ export default function Multi() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, i) => {
-                  const isSelected = row.code === selectedCode;
+                {results.map((row, i) => {
+                  const isSelected  = row.id === selectedId;
                   const isClickable = row.status === "done";
                   return (
-                    <tr key={row.code}
-                      onClick={() => isClickable && setSelectedCode(isSelected ? null : row.code)}
+                    <tr key={row.id}
+                      onClick={() => isClickable && setSelectedId(isSelected ? null : row.id)}
                       style={{
                         borderBottom: "1px solid #f3f4f6",
                         background: isSelected ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa",
@@ -221,14 +275,14 @@ export default function Multi() {
             </table>
           </div>
 
-          {rows.some((r) => r.status === "done") && !selectedRow && (
+          {results.some((r) => r.status === "done") && !selectedResult && (
             <p style={{ marginTop: 12, fontSize: 13, color: "#9ca3af", textAlign: "center" }}>
               Click a row to see its flagged issues
             </p>
           )}
 
-          {selectedRow?.analysis && (
-            <IssueList analysis={selectedRow.analysis} heading={selectedRow.name} />
+          {selectedResult?.analysis && (
+            <IssueList analysis={selectedResult.analysis} heading={selectedResult.name} />
           )}
         </>
       )}
