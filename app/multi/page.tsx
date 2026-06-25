@@ -48,6 +48,7 @@ export default function Multi() {
   const [template, setTemplate] = useState(EU_DEMO);
   const [languages, setLanguages] = useState(ALL_LANGUAGES);
   const [rows, setRows] = useState<Row[]>([]);
+  const [mode, setMode] = useState<"ai" | "mqm">("ai");
   const [running, setRunning] = useState(false);
 
   function toggleLang(code: string) {
@@ -61,7 +62,7 @@ export default function Multi() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, sourceUrl: "", targetLanguage: lang.name, mode: "ai" }),
+        body: JSON.stringify({ url, sourceUrl: "", targetLanguage: lang.name, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
@@ -123,6 +124,16 @@ export default function Multi() {
               </label>
             ))}
           </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+          <span style={{ fontSize: 14, color: "#374151" }}>Assessment method:</span>
+          {(["ai", "mqm"] as const).map((m) => (
+            <label key={m} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+              <input type="radio" name="multi-mode" value={m} checked={mode === m} onChange={() => setMode(m)} />
+              {m === "ai" ? "AI Judgment" : "MQM Framework"}
+            </label>
+          ))}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
