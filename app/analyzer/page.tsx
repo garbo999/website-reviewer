@@ -25,6 +25,7 @@ const DEMOS: { label: string; targetUrl: string; sourceUrl: string; targetLangua
   { label: "EN → FR comparison",targetUrl: `${EU_BASE}_fr`, sourceUrl: `${EU_BASE}_en`,targetLanguage: "French",  mode: "ai"  },
   { label: "BG → EN comparison",targetUrl: BTA_EN,          sourceUrl: BTA_BG,         targetLanguage: "English", mode: "ai"  },
   { label: "Varna — MQM",       targetUrl: "https://www.varna.bg/en/189", sourceUrl: "", targetLanguage: "English", mode: "mqm" },
+  { label: "ET → EN comparison",targetUrl: "https://taalihomes.ee/en/accommodation/metsamaja/", sourceUrl: "https://taalihomes.ee/majutus/metsamaja/", targetLanguage: "English", mode: "ai" },
 ];
 
 type Mode = "ai" | "mqm" | "comparison";
