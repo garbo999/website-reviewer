@@ -9,6 +9,46 @@ const LANGUAGES = [
   "Japanese", "Chinese", "Arabic", "Korean", "Turkish",
 ];
 
+const EU_BASE = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19";
+
+const DEMOS: { label: string; targetUrl: string; sourceUrl: string; targetLanguage: string; mode: "ai" | "mqm" }[] = [
+  {
+    label: "German — MQM",
+    targetUrl: `${EU_BASE}_de`,
+    sourceUrl: "",
+    targetLanguage: "German",
+    mode: "mqm",
+  },
+  {
+    label: "French — AI",
+    targetUrl: `${EU_BASE}_fr`,
+    sourceUrl: "",
+    targetLanguage: "French",
+    mode: "ai",
+  },
+  {
+    label: "Spanish — AI",
+    targetUrl: `${EU_BASE}_es`,
+    sourceUrl: "",
+    targetLanguage: "Spanish",
+    mode: "ai",
+  },
+  {
+    label: "EN → DE comparison",
+    targetUrl: `${EU_BASE}_de`,
+    sourceUrl: `${EU_BASE}_en`,
+    targetLanguage: "German",
+    mode: "ai",
+  },
+  {
+    label: "EN → FR comparison",
+    targetUrl: `${EU_BASE}_fr`,
+    sourceUrl: `${EU_BASE}_en`,
+    targetLanguage: "French",
+    mode: "ai",
+  },
+];
+
 type Dimension = { score: number; explanation: string; example: string };
 type Analysis = {
   linguistic_quality: Dimension;
@@ -62,8 +102,7 @@ export default function Home() {
   const canAnalyze = targetUrl.trim() || sourceUrl.trim();
   const isComparison = targetUrl.trim() && sourceUrl.trim();
 
-  async function handleAnalyze() {
-    if (!canAnalyze) return;
+  async function runAnalysis(tUrl: string, sUrl: string, lang: string, m: "ai" | "mqm") {
     setIsLoading(true);
     setError("");
     setAnalysis(null);
@@ -71,7 +110,7 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: targetUrl, sourceUrl, targetLanguage, mode }),
+        body: JSON.stringify({ url: tUrl, sourceUrl: sUrl, targetLanguage: lang, mode: m }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
@@ -84,6 +123,19 @@ export default function Home() {
     }
   }
 
+  async function handleAnalyze() {
+    if (!canAnalyze) return;
+    await runAnalysis(targetUrl, sourceUrl, targetLanguage, mode);
+  }
+
+  async function handleDemo(demo: typeof DEMOS[0]) {
+    setTargetUrl(demo.targetUrl);
+    setSourceUrl(demo.sourceUrl);
+    setTargetLanguage(demo.targetLanguage);
+    setMode(demo.mode);
+    await runAnalysis(demo.targetUrl, demo.sourceUrl, demo.targetLanguage, demo.mode);
+  }
+
   const overallColor = analysis
     ? analysis.overall.score >= 8 ? "#22c55e" : analysis.overall.score >= 6 ? "#f59e0b" : "#ef4444"
     : "#000";
@@ -93,9 +145,33 @@ export default function Home() {
   return (
     <main style={{ maxWidth: 760, margin: "48px auto", padding: "0 20px", fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 4 }}>Website Localization Reviewer</h1>
-      <p style={{ color: "#6b7280", marginBottom: 24 }}>
+      <p style={{ color: "#6b7280", marginBottom: 16 }}>
         Analyze a single page or compare source and target URLs for a full translation review.
       </p>
+
+      <div style={{ marginBottom: 24 }}>
+        <span style={{ fontSize: 13, color: "#6b7280", marginRight: 10 }}>Try a demo:</span>
+        {DEMOS.map((demo) => (
+          <button
+            key={demo.label}
+            onClick={() => handleDemo(demo)}
+            disabled={isLoading}
+            style={{
+              marginRight: 8,
+              marginBottom: 8,
+              padding: "4px 12px",
+              fontSize: 13,
+              borderRadius: 16,
+              border: "1px solid #d1d5db",
+              background: "#f9fafb",
+              color: "#374151",
+              cursor: isLoading ? "wait" : "pointer",
+            }}
+          >
+            {demo.label}
+          </button>
+        ))}
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
         <div>
