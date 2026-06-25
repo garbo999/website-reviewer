@@ -45,6 +45,7 @@ const QA = [
   },
   {
     q: "Further development ideas",
+    bullets: true,
     items: [
       { label: "API access", desc: "A REST API so the reviewer can be integrated into CI/CD pipelines, CMS workflows, or translation management systems for automated quality gates." },
       { label: "Rule-based grammar checking", desc: "LanguageTool integration for a fully deterministic Linguistic Quality score." },
@@ -73,7 +74,7 @@ export default function FAQ() {
               <p style={{ margin: 0, fontSize: 15, color: "#374151", lineHeight: 1.6 }}>{item.a}</p>
             )}
             {"items" in item && (
-              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+              <ul style={{ margin: 0, padding: 0, listStyle: "bullets" in item ? "disc" : "none", paddingLeft: "bullets" in item ? 20 : 0, display: "flex", flexDirection: "column", gap: 8 }}>
                 {item.items!.map((sub) => (
                   <li key={sub.label} style={{ fontSize: 15, color: "#374151", lineHeight: 1.6 }}>
                     <strong>{sub.label}</strong> — {sub.desc}
