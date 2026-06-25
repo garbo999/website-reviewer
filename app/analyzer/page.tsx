@@ -14,12 +14,16 @@ const LANGUAGES = [
 
 const EU_BASE = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19";
 
+const BTA_EN = "https://www.bta.bg/en/news/bulgaria/1155324-constitutional-court-annuls-parliament-resolution-ordering-government-to-pursue-";
+const BTA_BG = "https://www.bta.bg/bg/news/bulgaria/1155261-konstitutsionniyat-sad-obyavi-za-protivokonstitutsionno-reshenieto-na-parlamenta";
+
 const DEMOS: { label: string; targetUrl: string; sourceUrl: string; targetLanguage: string; mode: "ai" | "mqm" }[] = [
   { label: "German — MQM",      targetUrl: `${EU_BASE}_de`, sourceUrl: "",             targetLanguage: "German",  mode: "mqm" },
   { label: "French — AI",       targetUrl: `${EU_BASE}_fr`, sourceUrl: "",             targetLanguage: "French",  mode: "ai"  },
   { label: "Spanish — AI",      targetUrl: `${EU_BASE}_es`, sourceUrl: "",             targetLanguage: "Spanish", mode: "ai"  },
   { label: "EN → DE comparison",targetUrl: `${EU_BASE}_de`, sourceUrl: `${EU_BASE}_en`,targetLanguage: "German",  mode: "ai"  },
   { label: "EN → FR comparison",targetUrl: `${EU_BASE}_fr`, sourceUrl: `${EU_BASE}_en`,targetLanguage: "French",  mode: "ai"  },
+  { label: "BG → EN comparison",targetUrl: BTA_EN,          sourceUrl: BTA_BG,         targetLanguage: "English", mode: "ai"  },
 ];
 
 type Mode = "ai" | "mqm" | "comparison";
