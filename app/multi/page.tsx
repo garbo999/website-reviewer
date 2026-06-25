@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { IssueList, issueCount, type Analysis } from "../components/IssueList";
-import { buildCSV, buildMultiTextReport, download, type MultiRow } from "../lib/export";
+import { buildCSV, buildMultiTextReport, buildFilename, download, type MultiRow } from "../lib/export";
 
 const EU_DEMO = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19_{lang}";
 
@@ -142,7 +142,7 @@ export default function Multi() {
               onClick={() => {
                 const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
                 const report = buildMultiTextReport(doneRows, template.replace("_{lang}", ""), mode);
-                download("localization-review-multi.txt", report, "text/plain");
+                download(buildFilename("localization-review-multi", "txt"), report, "text/plain");
               }}
               style={{ padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
             >
@@ -152,7 +152,7 @@ export default function Multi() {
               onClick={() => {
                 const doneRows = rows.filter((r) => r.status === "done" && r.analysis) as MultiRow[];
                 const csv = buildCSV(doneRows);
-                download("localization-review-multi.csv", csv, "text/csv");
+                download(buildFilename("localization-review-multi", "csv"), csv, "text/csv");
               }}
               style={{ padding: "4px 12px", fontSize: 13, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
             >

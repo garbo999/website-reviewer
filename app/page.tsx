@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { IssueList, type Analysis, DIMENSIONS } from "./components/IssueList";
-import { buildTextReport, download } from "./lib/export";
+import { buildTextReport, buildFilename, download } from "./lib/export";
 
 const LANGUAGES = [
   "English", "German", "French", "Spanish", "Italian", "Portuguese",
@@ -202,7 +202,7 @@ export default function Home() {
                   onClick={() => {
                     const report = buildTextReport(analysis!, targetLanguage, usedMode, targetUrl, sourceUrl);
                     const slug = targetLanguage.toLowerCase().replace(/\s+/g, "-");
-                    download(`localization-review-${slug}.txt`, report, "text/plain");
+                    download(buildFilename(`localization-review-${slug}`, "txt"), report, "text/plain");
                   }}
                   style={{ marginLeft: "auto", padding: "3px 10px", fontSize: 12, borderRadius: 4, border: "1px solid #bbf7d0", background: "#fff", cursor: "pointer", color: "#374151" }}
                 >
@@ -227,7 +227,7 @@ export default function Home() {
               onClick={() => {
                 const report = buildTextReport(analysis!, targetLanguage, usedMode, targetUrl, sourceUrl);
                 const slug = targetLanguage.toLowerCase().replace(/\s+/g, "-");
-                download(`localization-review-${slug}.txt`, report, "text/plain");
+                download(buildFilename(`localization-review-${slug}`, "txt"), report, "text/plain");
               }}
               style={{ padding: "8px 20px", fontSize: 14, borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
             >

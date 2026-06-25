@@ -125,6 +125,22 @@ export function buildMultiTextReport(rows: MultiRow[], url: string, mode: string
   return lines.join("\n");
 }
 
+export function buildFilename(base: string, ext: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  let serial = 1;
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("export_serial");
+      if (stored) {
+        const { date, count } = JSON.parse(stored);
+        if (date === today) serial = count + 1;
+      }
+      localStorage.setItem("export_serial", JSON.stringify({ date: today, count: serial }));
+    } catch { /* localStorage unavailable */ }
+  }
+  return `${base}-${today}-${serial}.${ext}`;
+}
+
 export function download(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
   const url  = URL.createObjectURL(blob);
