@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { IssueList, issueCount, type Analysis } from "../components/IssueList";
-import { buildCSV, buildMultiTextReport, buildFilename, download, type MultiRow } from "../lib/export";
-import { saveReport } from "../lib/reports";
+import { IssueList, issueCount, type Analysis } from "./components/IssueList";
+import { buildCSV, buildMultiTextReport, buildFilename, download, type MultiRow } from "./lib/export";
+import { saveReport } from "./lib/reports";
 
 const EU_DEMO = "https://commission.europa.eu/news-and-media/news/take-splash-european-bathing-waters-remain-clean-2026-06-19_{lang}";
 
