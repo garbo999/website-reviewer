@@ -11,7 +11,7 @@ function extractText(html: string): string {
   return text.slice(0, 5000);
 }
 
-const JSON_INSTRUCTION = `IMPORTANT: Return only valid JSON. Use single quotes for any text you quote from the page inside the JSON string values — never double quotes inside JSON strings.`;
+const JSON_INSTRUCTION = `IMPORTANT: Return only valid JSON. Write all explanations, notes, and summaries in English, regardless of the language being analyzed. Use single quotes for any text you quote from the page inside the JSON string values — never double quotes inside JSON strings.`;
 
 const ISSUES_INSTRUCTION = `For each dimension, list up to 3 specific issues found as an array. Each issue must have:
 - "severity": "Critical", "Major", or "Minor"
