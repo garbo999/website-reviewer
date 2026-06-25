@@ -13,11 +13,17 @@ function extractText(html: string): string {
 
 const JSON_INSTRUCTION = `IMPORTANT: Return only valid JSON. Use single quotes for any text you quote from the page inside the JSON string values — never double quotes inside JSON strings.`;
 
+const ISSUES_INSTRUCTION = `For each dimension, list up to 3 specific issues found as an array. Each issue must have:
+- "severity": "Critical", "Major", or "Minor"
+- "quote": a short excerpt from the text that illustrates the problem (use single quotes within the text)
+- "note": one sentence explaining why this is an error
+If no issues are found for a dimension, use an empty array.`;
+
 const JSON_FORMAT = `{
-  "linguistic_quality": { "score": 0, "explanation": "", "example": "" },
-  "terminology_consistency": { "score": 0, "explanation": "", "example": "" },
-  "cultural_adaptation": { "score": 0, "explanation": "", "example": "" },
-  "completeness": { "score": 0, "explanation": "", "example": "" },
+  "linguistic_quality": { "score": 0, "explanation": "", "issues": [{ "severity": "Major", "quote": "example text", "note": "reason this is an error" }] },
+  "terminology_consistency": { "score": 0, "explanation": "", "issues": [] },
+  "cultural_adaptation": { "score": 0, "explanation": "", "issues": [] },
+  "completeness": { "score": 0, "explanation": "", "issues": [] },
   "overall": { "score": 0, "summary": "" }
 }`;
 
@@ -30,7 +36,8 @@ Score it on these 4 dimensions from 1 (poor) to 10 (excellent):
 3. Cultural Adaptation — appropriate tone, idioms, date/number formats, cultural references
 4. Completeness — no untranslated strings or mixed source language
 
-For each dimension give a score, one sentence explanation, and one example from the text (use single quotes for quoted text).
+For each dimension give a score and one sentence explanation.
+${ISSUES_INSTRUCTION}
 Then give an Overall score (average) and a 2-sentence summary.
 
 ${JSON_INSTRUCTION}
@@ -51,7 +58,8 @@ Identify errors in these MQM categories mapped to 4 dimensions:
 3. Cultural Adaptation (MQM: Style + Locale Conventions) — inappropriate register, wrong date/number/currency formats
 4. Completeness (MQM: Accuracy) — mistranslations, omissions, untranslated strings
 
-For each dimension: classify errors as Critical (penalty 25), Major (penalty 5), or Minor (penalty 1). Score = max(0, 100 - penalties) / 10. Give one sentence explanation and one example (single quotes for quoted text).
+For each dimension: classify errors as Critical (penalty 25), Major (penalty 5), or Minor (penalty 1). Score = max(0, 100 - penalties) / 10. Give one sentence explanation.
+${ISSUES_INSTRUCTION}
 Then give an Overall score (average) and a 2-sentence summary.
 
 ${JSON_INSTRUCTION}
@@ -72,7 +80,8 @@ Score the translation on 4 dimensions from 1 (poor) to 10 (excellent):
 3. Cultural Adaptation — appropriate adaptation of tone, idioms, date/number formats for a ${targetLanguage}-speaking audience
 4. Completeness — all content from SOURCE is present in TARGET with no omissions or untranslated strings
 
-For each dimension give a score, one sentence explanation based on the comparison, and one specific example (use single quotes for quoted text).
+For each dimension give a score and one sentence explanation based on the comparison.
+${ISSUES_INSTRUCTION}
 Then give an Overall score (average) and a 2-sentence summary highlighting the main strengths and issues found by comparing source and target.
 
 ${JSON_INSTRUCTION}
@@ -146,7 +155,7 @@ export async function POST(req: NextRequest) {
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
     });
 

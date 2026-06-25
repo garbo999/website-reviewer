@@ -49,7 +49,8 @@ const DEMOS: { label: string; targetUrl: string; sourceUrl: string; targetLangua
   },
 ];
 
-type Dimension = { score: number; explanation: string; example: string };
+type Issue = { severity: "Critical" | "Major" | "Minor"; quote: string; note: string };
+type Dimension = { score: number; explanation: string; issues: Issue[] };
 type Analysis = {
   linguistic_quality: Dimension;
   terminology_consistency: Dimension;
@@ -71,20 +72,94 @@ const MODE_COLORS: Record<Mode, { bg: string; text: string }> = {
   comparison: { bg: "#fef3c7", text: "#92400e" },
 };
 
+const SEVERITY_ORDER: Record<string, number> = { Critical: 0, Major: 1, Minor: 2 };
+
+const SEVERITY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  Critical: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
+  Major:    { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" },
+  Minor:    { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" },
+};
+
+const DIMENSION_LABELS: Record<string, string> = {
+  linguistic_quality:      "Linguistic Quality",
+  terminology_consistency: "Terminology",
+  cultural_adaptation:     "Cultural Adaptation",
+  completeness:            "Completeness",
+};
+
+const DIMENSIONS = ["linguistic_quality", "terminology_consistency", "cultural_adaptation", "completeness"] as const;
+
 function ScoreCard({ label, data }: { label: string; data: Dimension }) {
   const color = data.score >= 8 ? "#22c55e" : data.score >= 6 ? "#f59e0b" : "#ef4444";
+  const issues = data.issues ?? [];
+  const hasCritical = issues.some((i) => i.severity === "Critical");
   return (
     <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <strong style={{ fontSize: 15 }}>{label}</strong>
         <span style={{ fontSize: 24, fontWeight: 700, color }}>{data.score}/10</span>
       </div>
-      <p style={{ margin: "0 0 6px", fontSize: 14, color: "#374151" }}>{data.explanation}</p>
-      {data.example && (
-        <p style={{ margin: 0, fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>
-          &ldquo;{data.example}&rdquo;
+      <p style={{ margin: 0, fontSize: 14, color: "#374151" }}>{data.explanation}</p>
+      {issues.length > 0 && (
+        <p style={{ margin: "6px 0 0", fontSize: 12, color: hasCritical ? "#ef4444" : "#6b7280" }}>
+          {issues.length} issue{issues.length !== 1 ? "s" : ""} flagged
         </p>
       )}
+    </div>
+  );
+}
+
+function IssueList({ analysis }: { analysis: Analysis }) {
+  const allIssues = DIMENSIONS
+    .flatMap((dim) => (analysis[dim].issues ?? []).map((issue) => ({ ...issue, dimension: dim })))
+    .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3));
+
+  if (allIssues.length === 0) {
+    return (
+      <div style={{ marginTop: 20, padding: 14, background: "#f0fdf4", borderRadius: 8, fontSize: 14, color: "#166534" }}>
+        No specific issues found. The translation appears to meet quality standards.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px", color: "#111827" }}>
+        Flagged Issues ({allIssues.length})
+      </h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {allIssues.map((issue, i) => {
+          const c = SEVERITY_COLORS[issue.severity] ?? SEVERITY_COLORS.Minor;
+          return (
+            <div key={i} style={{
+              display: "grid",
+              gridTemplateColumns: "80px 140px 1fr",
+              gap: 12,
+              padding: "10px 14px",
+              background: c.bg,
+              border: `1px solid ${c.border}`,
+              borderRadius: 6,
+              fontSize: 14,
+              alignItems: "start",
+            }}>
+              <span style={{ fontWeight: 700, color: c.text, fontSize: 11, textTransform: "uppercase", paddingTop: 2 }}>
+                {issue.severity}
+              </span>
+              <span style={{ color: "#6b7280", fontSize: 13, paddingTop: 1 }}>
+                {DIMENSION_LABELS[issue.dimension]}
+              </span>
+              <div>
+                {issue.quote && (
+                  <p style={{ margin: "0 0 4px", fontStyle: "italic", color: "#374151" }}>
+                    &ldquo;{issue.quote}&rdquo;
+                  </p>
+                )}
+                <p style={{ margin: 0, color: "#374151" }}>{issue.note}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -283,6 +358,8 @@ export default function Home() {
             <ScoreCard label="Cultural Adaptation" data={analysis.cultural_adaptation} />
             <ScoreCard label="Completeness" data={analysis.completeness} />
           </div>
+
+          <IssueList analysis={analysis} />
         </div>
       )}
     </main>
