@@ -169,6 +169,11 @@ export default function Home() {
           }}>
             {isLoading ? "Analyzing…" : isComparison ? "Compare" : "Analyze"}
           </button>
+          {!canAnalyze && !isLoading && (
+            <span style={{ fontSize: 13, color: "#9ca3af" }}>
+              ← Enter a URL, or try a demo above
+            </span>
+          )}
         </div>
       </div>
 
