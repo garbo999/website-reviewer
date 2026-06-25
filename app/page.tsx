@@ -189,7 +189,7 @@ export default function Home() {
               {analysis.overall.score}/10
             </div>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
                 <strong style={{ fontSize: 16 }}>Overall Score — {targetLanguage}</strong>
                 <span style={{
                   fontSize: 11, padding: "2px 8px", borderRadius: 12,
@@ -198,6 +198,16 @@ export default function Home() {
                 }}>
                   {MODE_LABELS[usedMode]}
                 </span>
+                <button
+                  onClick={() => {
+                    const report = buildTextReport(analysis!, targetLanguage, usedMode, targetUrl, sourceUrl);
+                    const slug = targetLanguage.toLowerCase().replace(/\s+/g, "-");
+                    download(`localization-review-${slug}.txt`, report, "text/plain");
+                  }}
+                  style={{ marginLeft: "auto", padding: "3px 10px", fontSize: 12, borderRadius: 4, border: "1px solid #bbf7d0", background: "#fff", cursor: "pointer", color: "#374151" }}
+                >
+                  ↓ Export report
+                </button>
               </div>
               <p style={{ margin: "4px 0 0", color: "#374151" }}>{analysis.overall.summary}</p>
             </div>
