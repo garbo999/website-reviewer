@@ -96,10 +96,15 @@ TARGET TEXT (${targetLanguage}):
 ${targetText}`;
 }
 
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xhtml+xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+};
+
 async function fetchPage(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; LocalizationReviewer/1.0)" },
-  });
+  const response = await fetch(url, { headers: BROWSER_HEADERS });
   if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
   return extractText(await response.text());
 }
