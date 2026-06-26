@@ -17,7 +17,7 @@ export type MultiReport = {
   type: "multi";
   templateUrl: string;
   mode: string;
-  rows: { name: string; analysis: Analysis }[];
+  rows: { name: string; url?: string; analysis: Analysis }[];
 };
 
 export type SavedReport = SingleReport | MultiReport;

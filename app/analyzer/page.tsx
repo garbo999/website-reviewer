@@ -133,15 +133,23 @@ export default function Home() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
         <div>
-          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>Target URL (translated page)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <label style={{ fontSize: 13, color: "#6b7280" }}>Target URL (translated page)</label>
+            {targetUrl.trim() && (
+              <a href={targetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#0070f3", textDecoration: "none" }}>↗ open</a>
+            )}
+          </div>
           <input type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)}
             placeholder="https://commission.europa.eu/index_de"
             style={{ width: "100%", padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box" }} />
         </div>
         <div>
-          <label style={{ fontSize: 13, color: "#6b7280", display: "block", marginBottom: 4 }}>
-            Source URL (original language) — leave blank to analyze target only
-          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <label style={{ fontSize: 13, color: "#6b7280" }}>Source URL (original language) — leave blank to analyze target only</label>
+            {sourceUrl.trim() && (
+              <a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "#0070f3", textDecoration: "none" }}>↗ open</a>
+            )}
+          </div>
           <input type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)}
             placeholder="https://commission.europa.eu/index_en"
             style={{ width: "100%", padding: 10, fontSize: 15, borderRadius: 4, border: "1px solid #d1d5db", boxSizing: "border-box" }} />

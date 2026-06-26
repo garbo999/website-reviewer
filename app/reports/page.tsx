@@ -43,8 +43,19 @@ function SingleCard({ report, onDelete }: { report: SingleReport; onDelete: () =
         <span style={{ fontWeight: 700, fontSize: 16, color: scoreColor(report.analysis.overall.score) }}>
           {report.analysis.overall.score}/10
         </span>
-        <span style={{ fontSize: 13, color: "#6b7280", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {report.url || report.sourceUrl}
+        <span style={{ display: "flex", gap: 10, flex: 1, overflow: "hidden", flexWrap: "wrap" }}>
+          {report.url && (
+            <a href={report.url} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 13, color: "#0070f3", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              ↗ target
+            </a>
+          )}
+          {report.sourceUrl && (
+            <a href={report.sourceUrl} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 13, color: "#6b7280", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              ↗ source
+            </a>
+          )}
         </span>
         <button
           onClick={() => {
@@ -86,7 +97,14 @@ function MultiCard({ report, onDelete }: { report: MultiReport; onDelete: () => 
         <strong style={{ fontSize: 14 }}>Multi-language ({report.rows.length})</strong>
         <ModeTag mode={report.mode} />
         <span style={{ fontSize: 13, color: "#6b7280", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {report.rows.map((r) => r.name).join(", ")}
+          {report.rows.map((r, i) => (
+            <span key={r.name}>
+              {i > 0 && ", "}
+              {r.url
+                ? <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: "#0070f3", textDecoration: "none" }}>{r.name} ↗</a>
+                : r.name}
+            </span>
+          ))}
         </span>
         <button
           onClick={() => {
@@ -132,7 +150,13 @@ function MultiCard({ report, onDelete }: { report: MultiReport; onDelete: () => 
                 <tr key={row.name}
                   onClick={() => setSelectedLang(selectedLang === row.name ? null : row.name)}
                   style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer", background: selectedLang === row.name ? "#eff6ff" : "transparent" }}>
-                  <td style={{ padding: "8px 10px", fontWeight: 500, textAlign: "center" }}>{row.name}</td>
+                  <td style={{ padding: "8px 10px", fontWeight: 500, textAlign: "center" }}>
+                    {row.name}
+                    {row.url && (
+                      <a href={row.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                        style={{ marginLeft: 6, fontSize: 12, color: "#0070f3", textDecoration: "none" }}>↗</a>
+                    )}
+                  </td>
                   {[row.analysis.overall.score, row.analysis.linguistic_quality.score, row.analysis.terminology_consistency.score, row.analysis.cultural_adaptation.score, row.analysis.completeness.score].map((s, i) => (
                     <td key={i} style={{ padding: "8px 10px", textAlign: "center", fontWeight: 600, color: scoreColor(s) }}>{s}</td>
                   ))}

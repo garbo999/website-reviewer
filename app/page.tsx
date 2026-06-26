@@ -107,7 +107,11 @@ export default function Multi() {
     const results = await Promise.all(valid.map((r) => analyzeOne(r)));
     const successRows = results.filter(Boolean) as { name: string; analysis: Analysis }[];
     if (successRows.length > 0) {
-      saveReport({ type: "multi", templateUrl: "", mode, rows: successRows });
+      const rowsWithUrl = successRows.map((r) => {
+        const lr = langRows.find((l) => l.name === r.name);
+        return { ...r, url: lr?.url ?? "" };
+      });
+      saveReport({ type: "multi", templateUrl: "", mode, rows: rowsWithUrl });
     }
     setRunning(false);
   }
@@ -247,7 +251,13 @@ export default function Multi() {
                         cursor: isClickable ? "pointer" : "default",
                       }}
                     >
-                      <td style={{ padding: "10px 16px", fontWeight: 500 }}>{row.name}</td>
+                      <td style={{ padding: "10px 16px", fontWeight: 500 }}>
+                        <span>{row.name}</span>
+                        {(() => { const lr = langRows.find((r) => r.id === row.id); return lr?.url ? (
+                          <a href={lr.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                            style={{ marginLeft: 8, fontSize: 12, color: "#0070f3", textDecoration: "none" }}>↗</a>
+                        ) : null; })()}
+                      </td>
                       {row.status === "loading" || row.status === "idle" ? (
                         <td colSpan={6} style={{ padding: "10px 12px", color: "#9ca3af", fontSize: 13 }}>
                           {row.status === "loading" ? "Analyzing…" : "Waiting…"}
